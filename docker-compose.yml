@@ -1,0 +1,95 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: helpdesk_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d
+    networks:
+      - helpdesk_network
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: helpdesk_n8n
+    user: "0:0"
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+
+      N8N_HOST: ${N8N_HOST}
+      N8N_PORT: ${N8N_PORT}
+      N8N_PROTOCOL: ${N8N_PROTOCOL}
+      WEBHOOK_URL: ${WEBHOOK_URL}
+
+      GENERIC_TIMEZONE: America/Guatemala
+      TZ: America/Guatemala
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./reports:/files/reports
+      - ./logs:/files/logs
+      - ./workflows:/files/workflows
+    depends_on:
+      - postgres
+    networks:
+      - helpdesk_network
+
+  dashboard:
+    image: node:20
+    container_name: helpdesk_dashboard
+    restart: always
+    working_dir: /app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./dashboard:/app
+    depends_on:
+      - postgres
+    networks:
+      - helpdesk_network
+
+  adminer:
+    image: adminer:latest
+    container_name: helpdesk_adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - helpdesk_network
+
+volumes:
+  postgres_data:
+  n8n_data:
+
+networks:
+  helpdesk_network:
+    driver: bridge

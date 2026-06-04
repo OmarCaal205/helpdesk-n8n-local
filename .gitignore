@@ -1,0 +1,18 @@
+# Variables sensibles
+.env
+
+# Backups de base de datos
+backup_helpdesk_db.sql
+*.sql
+
+# Node
+node_modules/
+dashboard/node_modules/
+
+# Logs
+logs/
+*.log
+
+# Archivos temporales
+.DS_Store
+Thumbs.db

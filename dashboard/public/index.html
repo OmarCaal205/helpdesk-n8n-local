@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard HelpDesk Local</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div>
+      <h1>Dashboard HelpDesk Local</h1>
+      <p>Sistema de mesa de ayuda automatizado con n8n y PostgreSQL</p>
+    </div>
+    <button id="btnActualizar">Actualizar datos</button>
+  </header>
+
+  <main class="container">
+    <section class="status-card" id="estadoConexion">
+      Verificando conexión...
+    </section>
+
+    <section class="cards">
+      <article class="card">
+        <span>Total tickets</span>
+        <strong id="totalTickets">0</strong>
+      </article>
+
+      <article class="card">
+        <span>Nuevos</span>
+        <strong id="ticketsNuevos">0</strong>
+      </article>
+
+      <article class="card">
+        <span>Prioridad alta</span>
+        <strong id="ticketsAltos">0</strong>
+      </article>
+
+      <article class="card danger">
+        <span>Críticos</span>
+        <strong id="ticketsCriticos">0</strong>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">
+        <h2>Tickets registrados</h2>
+        <p>Últimos tickets ingresados desde el formulario de n8n</p>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Solicitante</th>
+              <th>Departamento</th>
+              <th>Categoría</th>
+              <th>Prioridad</th>
+              <th>Estado</th>
+              <th>Técnico</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="tablaTickets"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grid">
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Bitácora</h2>
+          <p>Eventos registrados en audit_logs</p>
+        </div>
+        <div class="table-wrapper small">
+          <table>
+            <thead>
+              <tr>
+                <th>Acción</th>
+                <th>Workflow</th>
+                <th>Detalle</th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody id="tablaAudit"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Errores</h2>
+          <p>Errores capturados por el workflow de manejo de errores</p>
+        </div>
+        <div class="table-wrapper small">
+          <table>
+            <thead>
+              <tr>
+                <th>Workflow</th>
+                <th>Nodo</th>
+                <th>Error</th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody id="tablaErrores"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
