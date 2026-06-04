@@ -1,0 +1,193 @@
+{
+  "name": "02 - Reporte automático de tickets",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 17
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b31f19d6-14fb-4db9-a5db-be92d766fc80",
+      "name": "Programar reporte diario"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT json_build_object(\n  'resumen', (\n    SELECT json_build_object(\n      'total_tickets', COUNT(*),\n      'tickets_nuevos', COUNT(*) FILTER (WHERE estado = 'Nuevo'),\n      'tickets_en_proceso', COUNT(*) FILTER (WHERE estado = 'En proceso'),\n      'tickets_cerrados', COUNT(*) FILTER (WHERE estado = 'Cerrado'),\n      'tickets_criticos', COUNT(*) FILTER (WHERE prioridad = 'Crítica'),\n      'tickets_altos', COUNT(*) FILTER (WHERE prioridad = 'Alta'),\n      'tickets_medios', COUNT(*) FILTER (WHERE prioridad = 'Media'),\n      'tickets_bajos', COUNT(*) FILTER (WHERE prioridad = 'Baja')\n    )\n    FROM tickets\n  ),\n  'ultimos_tickets', (\n    SELECT COALESCE(json_agg(t), '[]'::json)\n    FROM (\n      SELECT \n        codigo_ticket,\n        nombre,\n        departamento,\n        categoria,\n        urgencia,\n        prioridad,\n        estado,\n        tecnico_asignado,\n        fecha_creacion\n      FROM tickets\n      ORDER BY fecha_creacion DESC\n      LIMIT 10\n    ) t\n  )\n) AS reporte;;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "947025d5-5a06-4157-89af-1ee39e3eccbd",
+      "name": "Consultar datos del reporte",
+      "credentials": {
+        "postgres": {
+          "id": "5KoQodoxiiJPdApi",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const data = $json.reporte;\nconst resumen = data.resumen;\nconst tickets = data.ultimos_tickets || [];\n\nconst fecha = new Date().toLocaleString(\"es-GT\", {\n  timeZone: \"America/Guatemala\"\n});\n\nconst filasTickets = tickets.map(t => `\n  <tr>\n    <td>${t.codigo_ticket}</td>\n    <td>${t.nombre}</td>\n    <td>${t.departamento || \"No especificado\"}</td>\n    <td>${t.categoria}</td>\n    <td>${t.urgencia}</td>\n    <td>${t.prioridad}</td>\n    <td>${t.estado}</td>\n    <td>${t.tecnico_asignado || \"Sin asignar\"}</td>\n    <td>${new Date(t.fecha_creacion).toLocaleString(\"es-GT\", { timeZone: \"America/Guatemala\" })}</td>\n  </tr>\n`).join(\"\");\n\nconst html = `\n<!DOCTYPE html>\n<html lang=\"es\">\n<head>\n  <meta charset=\"UTF-8\">\n  <title>Reporte HelpDesk</title>\n  <style>\n    body {\n      font-family: Arial, sans-serif;\n      margin: 30px;\n      color: #222;\n    }\n    h1 {\n      background: #1f4e79;\n      color: white;\n      padding: 15px;\n      border-radius: 8px;\n    }\n    .fecha {\n      color: #555;\n      margin-bottom: 20px;\n    }\n    .cards {\n      display: grid;\n      grid-template-columns: repeat(4, 1fr);\n      gap: 12px;\n      margin-bottom: 25px;\n    }\n    .card {\n      border: 1px solid #ddd;\n      border-radius: 8px;\n      padding: 15px;\n      background: #f8f8f8;\n      text-align: center;\n    }\n    .card h2 {\n      margin: 0;\n      font-size: 28px;\n      color: #1f4e79;\n    }\n    .card p {\n      margin: 5px 0 0 0;\n      font-weight: bold;\n    }\n    table {\n      width: 100%;\n      border-collapse: collapse;\n      font-size: 13px;\n      margin-bottom: 20px;\n    }\n    th {\n      background: #1f4e79;\n      color: white;\n      padding: 8px;\n    }\n    td {\n      border: 1px solid #ccc;\n      padding: 8px;\n    }\n    tr:nth-child(even) {\n      background: #f2f2f2;\n    }\n    .footer {\n      margin-top: 30px;\n      font-size: 12px;\n      color: #666;\n      border-top: 1px solid #ccc;\n      padding-top: 10px;\n    }\n  </style>\n</head>\n<body>\n\n  <h1>Reporte Automático de Tickets - HelpDesk</h1>\n\n  <p class=\"fecha\"><strong>Fecha de generación:</strong> ${fecha}</p>\n\n  <div class=\"cards\">\n    <div class=\"card\">\n      <h2>${resumen.total_tickets}</h2>\n      <p>Total tickets</p>\n    </div>\n    <div class=\"card\">\n      <h2>${resumen.tickets_nuevos}</h2>\n      <p>Nuevos</p>\n    </div>\n    <div class=\"card\">\n      <h2>${resumen.tickets_altos}</h2>\n      <p>Prioridad Alta</p>\n    </div>\n    <div class=\"card\">\n      <h2>${resumen.tickets_criticos}</h2>\n      <p>Críticos</p>\n    </div>\n  </div>\n\n  <h2>Resumen por prioridad</h2>\n\n  <table>\n    <tr>\n      <th>Crítica</th>\n      <th>Alta</th>\n      <th>Media</th>\n      <th>Baja</th>\n    </tr>\n    <tr>\n      <td>${resumen.tickets_criticos}</td>\n      <td>${resumen.tickets_altos}</td>\n      <td>${resumen.tickets_medios}</td>\n      <td>${resumen.tickets_bajos}</td>\n    </tr>\n  </table>\n\n  <h2>Últimos tickets registrados</h2>\n\n  <table>\n    <tr>\n      <th>Código</th>\n      <th>Solicitante</th>\n      <th>Departamento</th>\n      <th>Categoría</th>\n      <th>Urgencia</th>\n      <th>Prioridad</th>\n      <th>Estado</th>\n      <th>Técnico</th>\n      <th>Fecha</th>\n    </tr>\n    ${filasTickets}\n  </table>\n\n  <div class=\"footer\">\n    Reporte generado automáticamente por el Sistema HelpDesk Local Automatizado con n8n.\n  </div>\n\n</body>\n</html>\n`;\n\nconst nombreArchivo = `reporte-helpdesk-${Date.now()}.html`;\n\nreturn {\n  json: {\n    nombre_archivo: nombreArchivo,\n    ruta_archivo: `/files/reports/${nombreArchivo}`,\n    html,\n    total_tickets: resumen.total_tickets,\n    fecha_generacion: fecha\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "94c8f8dd-25df-4768-a1c7-408e9bbb0c1d",
+      "name": "Generar reporte HTML"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "html",
+        "options": {
+          "fileName": "={{ $json.nombre_archivo }}"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        0
+      ],
+      "id": "7d2adfc5-aeaf-4963-bd63-31ed58121e3e",
+      "name": "Convertir HTML a archivo"
+    },
+    {
+      "parameters": {
+        "fromEmail": "prolinkav312@gmail.com",
+        "toEmail": "prolinkav312@gmail.com",
+        "subject": "=Reporte automático HelpDesk - {{ $(\"Generar reporte HTML\").item.json.fecha_generacion }}",
+        "html": "={{ $(\"Generar reporte HTML\").item.json.html }}",
+        "options": {
+          "attachments": "data"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        832,
+        0
+      ],
+      "id": "55c3a211-24ec-44bb-96cd-bcf8040e5ff2",
+      "name": "Send an Email",
+      "webhookId": "7cbb2b89-b368-4975-8bb6-0ae78e2825ea",
+      "credentials": {
+        "smtp": {
+          "id": "pUIVVdEbPF6T0isQ",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO audit_logs (\n  accion,\n  detalle,\n  workflow\n)\nVALUES (\n  'REPORTE_GENERADO',\n  'Se generó y envió por correo el reporte automático de tickets. Total de tickets: {{ $(\"Generar reporte HTML\").item.json.total_tickets }}. Archivo: {{ $(\"Generar reporte HTML\").item.json.nombre_archivo }}',\n  '02 - Reporte de Tickets HelpDesk'\n)\nRETURNING *;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "482021c5-07d4-4da6-a249-92b9f7d48161",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "5KoQodoxiiJPdApi",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Programar reporte diario": {
+      "main": [
+        [
+          {
+            "node": "Consultar datos del reporte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar datos del reporte": {
+      "main": [
+        [
+          {
+            "node": "Generar reporte HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar reporte HTML": {
+      "main": [
+        [
+          {
+            "node": "Convertir HTML a archivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convertir HTML a archivo": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an Email": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "077a9073-18c9-459c-882b-92ff121b714b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "39c8af791a4824f47287ed9c181b0a76e90d208fe04cd2dd2135964d6d1fa3de"
+  },
+  "id": "Tpsdg48MCwpPdXs8",
+  "tags": []
+}

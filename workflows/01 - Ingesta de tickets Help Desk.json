@@ -1,0 +1,289 @@
+{
+  "name": "01 - Ingesta de tickets Help Desk",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Mesa de Ayuda - Registro de Ticket",
+        "formDescription": "Complete este formulario para reportar un problema técnico. El sistema generará un ticket automáticamente.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Nombre completo ",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Correo electronico ",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Departamento "
+            },
+            {
+              "fieldLabel": "Categoria del problema ",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Internet "
+                  },
+                  {
+                    "option": "Computadora"
+                  },
+                  {
+                    "option": "Sistema "
+                  },
+                  {
+                    "option": "Impresora"
+                  },
+                  {
+                    "option": "Otro"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Nivel de urgencia ",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Baja "
+                  },
+                  {
+                    "option": "Media "
+                  },
+                  {
+                    "option": "Alta "
+                  },
+                  {
+                    "option": "Critica "
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Descripción del problema ",
+              "fieldType": "textarea",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -96,
+        0
+      ],
+      "id": "e84d27de-46e8-4037-a428-7d5746e8c33f",
+      "name": "Recibe formulario",
+      "webhookId": "f5408f3a-97ec-4efb-9b11-8036770e7619"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const body = $json;\n\nfunction normalizar(texto) {\n  return texto\n    .toString()\n    .toLowerCase()\n    .normalize(\"NFD\")\n    .replace(/[\\u0300-\\u036f]/g, \"\")\n    .trim();\n}\n\nfunction obtenerCampo(posiblesNombres) {\n  const keys = Object.keys(body);\n\n  for (const posible of posiblesNombres) {\n    const posibleNormalizado = normalizar(posible);\n\n    for (const key of keys) {\n      const keyNormalizado = normalizar(key);\n\n      if (keyNormalizado === posibleNormalizado) {\n        return body[key];\n      }\n    }\n  }\n\n  return \"\";\n}\n\nconst nombre = obtenerCampo([\"Nombre completo\", \"nombre\"]);\nconst correo = obtenerCampo([\"Correo electronico\", \"Correo electrónico\", \"correo\"]);\nconst departamento = obtenerCampo([\"Departamento\", \"departamento\"]) || \"No especificado\";\nconst categoria = obtenerCampo([\"Categoría del problema\", \"Categoria del problema\", \"categoria\"]);\nconst urgencia = obtenerCampo([\"Nivel de urgencia\", \"urgencia\"]);\nconst descripcion = obtenerCampo([\"Descripción del problema\", \"Descripcion del problema\", \"descripcion\"]);\n\nconst fecha = new Date();\nconst timestamp = fecha.getTime();\n\nlet prioridad = \"Media\";\n\nconst urgenciaLower = normalizar(urgencia || \"\");\nconst categoriaLower = normalizar(categoria || \"\");\nconst descripcionLower = normalizar(descripcion || \"\");\n\nif (\n  urgenciaLower.includes(\"critica\") ||\n  descripcionLower.includes(\"no funciona\") ||\n  descripcionLower.includes(\"caido\") ||\n  descripcionLower.includes(\"urgente\")\n) {\n  prioridad = \"Crítica\";\n} else if (\n  urgenciaLower.includes(\"alta\") ||\n  categoriaLower.includes(\"internet\") ||\n  categoriaLower.includes(\"sistema\")\n) {\n  prioridad = \"Alta\";\n} else if (urgenciaLower.includes(\"baja\")) {\n  prioridad = \"Baja\";\n}\n\nlet tecnico = \"María González\";\n\nif (categoriaLower.includes(\"internet\") || categoriaLower.includes(\"red\")) {\n  tecnico = \"Carlos Méndez\";\n} else if (categoriaLower.includes(\"computadora\") || categoriaLower.includes(\"hardware\")) {\n  tecnico = \"Ana López\";\n} else if (categoriaLower.includes(\"sistema\") || categoriaLower.includes(\"software\")) {\n  tecnico = \"Luis Ramírez\";\n} else if (categoriaLower.includes(\"impresora\")) {\n  tecnico = \"María González\";\n}\n\nreturn {\n  json: {\n    codigo_ticket: `HD-${timestamp}`,\n    nombre,\n    correo,\n    departamento,\n    categoria,\n    descripcion,\n    urgencia,\n    prioridad,\n    estado: \"Nuevo\",\n    tecnico_asignado: tecnico,\n    mensaje: \"Ticket preparado correctamente\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        -16
+      ],
+      "id": "e0377c10-9ed5-46cd-af2e-7dae7381db7f",
+      "name": "Genera código, prioridad y técnico"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO tickets (\n  codigo_ticket,\n  nombre,\n  correo,\n  departamento,\n  categoria,\n  descripcion,\n  urgencia,\n  prioridad,\n  estado,\n  tecnico_asignado\n)\nVALUES (\n  '{{ $json.codigo_ticket }}',\n  '{{ $json.nombre }}',\n  '{{ $json.correo }}',\n  '{{ $json.departamento }}',\n  '{{ $json.categoria }}',\n  '{{ $json.descripcion }}',\n  '{{ $json.urgencia }}',\n  '{{ $json.prioridad }}',\n  '{{ $json.estado }}',\n  '{{ $json.tecnico_asignado }}'\n)\nRETURNING *;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        576,
+        -16
+      ],
+      "id": "4039d174-8323-4d31-9a07-6a62c2cf5b7e",
+      "name": "Guarda el ticket ",
+      "credentials": {
+        "postgres": {
+          "id": "5KoQodoxiiJPdApi",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO audit_logs (\n  accion,\n  detalle,\n  workflow,\n  codigo_ticket\n)\nVALUES (\n  'TICKET_CREADO',\n  'Se creó un nuevo ticket con prioridad {{ $(\"Genera código, prioridad y técnico\").item.json.prioridad }} y técnico asignado {{ $(\"Genera código, prioridad y técnico\").item.json.tecnico_asignado }}',\n  '01 - Ingesta de Tickets HelpDesk',\n  '{{ $(\"Genera código, prioridad y técnico\").item.json.codigo_ticket }}'\n)\nRETURNING *;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        768,
+        -16
+      ],
+      "id": "f2b65338-fd64-4d90-b6e4-e57f9c0817cb",
+      "name": "Guarda auditoría",
+      "credentials": {
+        "postgres": {
+          "id": "ozBzEVZINJbMUBdt",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "prolinkav312@gmail.com",
+        "toEmail": "prolinkav312@gmail.com",
+        "subject": "=Mesa de Ayuda | Ticket {{ $(\"Genera código, prioridad y técnico\").item.json.codigo_ticket }} registrado correctamente",
+        "html": "=<h2>Ticket registrado correctamente</h2>\n\n<p>Hola {{ $(\"Genera código, prioridad y técnico\").item.json.nombre }},</p>\n\n<p>Tu solicitud fue registrada correctamente en el sistema de Mesa de Ayuda.</p>\n\n<table border=\"1\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse: collapse;\">\n  <tr>\n    <td><strong>Código del ticket</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.codigo_ticket }}</td>\n  </tr>\n  <tr>\n    <td><strong>Categoría</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.categoria }}</td>\n  </tr>\n  <tr>\n    <td><strong>Urgencia reportada</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.urgencia }}</td>\n  </tr>\n  <tr>\n    <td><strong>Prioridad asignada</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.prioridad }}</td>\n  </tr>\n  <tr>\n    <td><strong>Estado</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.estado }}</td>\n  </tr>\n  <tr>\n    <td><strong>Técnico asignado</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.tecnico_asignado }}</td>\n  </tr>\n</table>\n\n<p><strong>Descripción del problema:</strong></p>\n<p>{{ $(\"Genera código, prioridad y técnico\").item.json.descripcion }}</p>\n\n<p>El equipo de soporte revisará tu caso y dará seguimiento según la prioridad asignada.</p>\n\n<p>Gracias por utilizar el sistema de Mesa de Ayuda.</p>\n\n<hr>\n\n<p><small>Correo generado automáticamente por el Sistema HelpDesk Local Automatizado con n8n.</small></p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        976,
+        -304
+      ],
+      "id": "50eda470-49c3-4f4f-bde0-6fef1815849a",
+      "name": "Correo al usuario",
+      "webhookId": "15374800-4eb8-446d-b6d9-fa0c60f0166d",
+      "credentials": {
+        "smtp": {
+          "id": "pUIVVdEbPF6T0isQ",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "=prolinkav312@gmail.com",
+        "toEmail": "prolinkav312@gmail.com",
+        "subject": "=Nuevo ticket asignado - {{ $(\"Genera código, prioridad y técnico\").item.json.codigo_ticket }}",
+        "html": "=<h2>Nuevo ticket asignado</h2>\n\n<p>Se ha generado un nuevo ticket en la Mesa de Ayuda.</p>\n\n<table border=\"1\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse: collapse;\">\n  <tr>\n    <td><strong>Código</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.codigo_ticket }}</td>\n  </tr>\n  <tr>\n    <td><strong>Solicitante</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.nombre }}</td>\n  </tr>\n  <tr>\n    <td><strong>Correo</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.correo }}</td>\n  </tr>\n  <tr>\n    <td><strong>Departamento</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.departamento }}</td>\n  </tr>\n  <tr>\n    <td><strong>Categoría</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.categoria }}</td>\n  </tr>\n  <tr>\n    <td><strong>Prioridad</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.prioridad }}</td>\n  </tr>\n  <tr>\n    <td><strong>Técnico asignado</strong></td>\n    <td>{{ $(\"Genera código, prioridad y técnico\").item.json.tecnico_asignado }}</td>\n  </tr>\n</table>\n\n<p><strong>Descripción:</strong></p>\n<p>{{ $(\"Genera código, prioridad y técnico\").item.json.descripcion }}</p>\n\n<p>Favor revisar y dar seguimiento al caso.</p>\n\n<hr>\n\n<p><small>Notificación automática generada por n8n.</small></p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1040,
+        272
+      ],
+      "id": "bcc1cee6-b833-4996-a1cd-22afeeb1893f",
+      "name": "Corre al técnico o administrador",
+      "webhookId": "f3ca91a7-c05c-473c-b7a4-ce42a799070e",
+      "credentials": {
+        "smtp": {
+          "id": "pUIVVdEbPF6T0isQ",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Ticket registrado correctamente",
+        "completionMessage": "Su ticket fue registrado correctamente. Revise su correo electrónico para ver el comprobante y el código de seguimiento. El equipo de soporte dará seguimiento según la prioridad asignada.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1264,
+        -32
+      ],
+      "id": "41eed577-1356-4a2f-bba1-d49858439ad5",
+      "name": "Pantalla Final",
+      "webhookId": "7ddfb423-bfeb-4e8d-9e95-ef397478b104"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Recibe formulario": {
+      "main": [
+        [
+          {
+            "node": "Genera código, prioridad y técnico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Genera código, prioridad y técnico": {
+      "main": [
+        [
+          {
+            "node": "Guarda el ticket ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guarda el ticket ": {
+      "main": [
+        [
+          {
+            "node": "Guarda auditoría",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guarda auditoría": {
+      "main": [
+        [
+          {
+            "node": "Correo al usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Correo al usuario": {
+      "main": [
+        [
+          {
+            "node": "Corre al técnico o administrador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Corre al técnico o administrador": {
+      "main": [
+        [
+          {
+            "node": "Pantalla Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "3bf4f414-3a3e-46ae-80a9-2fd8196523b9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "39c8af791a4824f47287ed9c181b0a76e90d208fe04cd2dd2135964d6d1fa3de"
+  },
+  "id": "oXh3OgxUY38TxRlv",
+  "tags": []
+}

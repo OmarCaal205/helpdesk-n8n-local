@@ -1,0 +1,123 @@
+{
+  "name": "03 - Manejo de errores",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "460edffa-9d5f-4481-8ec6-58659e1ab7fe",
+      "name": "Capturar error del sistema"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const error = $json;\n\nconst workflowName =\n  error.workflow?.name ||\n  error.execution?.workflowName ||\n  \"Workflow no identificado\";\n\nconst nodeName =\n  error.node?.name ||\n  error.execution?.lastNodeExecuted ||\n  \"Nodo no identificado\";\n\nconst message =\n  error.error?.message ||\n  error.message ||\n  \"Error no especificado\";\n\nreturn {\n  json: {\n    workflow: workflowName,\n    nodo: nodeName,\n    mensaje_error: message,\n    datos: JSON.stringify(error),\n    fecha: new Date().toISOString()\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "f529774d-fd38-4ce7-89c3-71c41a4dc193",
+      "name": "Preparar detalle del error"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO errores (\n  workflow,\n  nodo,\n  mensaje_error,\n  datos\n)\nVALUES (\n  '{{ $json.workflow }}',\n  '{{ $json.nodo }}',\n  '{{ $json.mensaje_error }}',\n  '{{ $json.datos }}'::jsonb\n)\nRETURNING *;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        416,
+        0
+      ],
+      "id": "ab5cbf29-ab4f-482a-9f97-bf2907f43aba",
+      "name": "Guardar error en BD",
+      "credentials": {
+        "postgres": {
+          "id": "5KoQodoxiiJPdApi",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "prolinkav312@gmail.com",
+        "toEmail": "prolinkav312@gmail.com",
+        "subject": "=Alerta de error en HelpDesk - {{ $json.workflow }}",
+        "html": "=<h2>Alerta de error en el sistema HelpDesk</h2>\n\n<p>Se detectó un error durante la ejecución de un workflow.</p>\n\n<table border=\"1\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse: collapse;\">\n  <tr>\n    <td><strong>Workflow</strong></td>\n    <td>{{ $json.workflow }}</td>\n  </tr>\n  <tr>\n    <td><strong>Nodo</strong></td>\n    <td>{{ $json.nodo }}</td>\n  </tr>\n  <tr>\n    <td><strong>Mensaje de error</strong></td>\n    <td>{{ $json.mensaje_error }}</td>\n  </tr>\n  <tr>\n    <td><strong>Fecha</strong></td>\n    <td>{{ $json.fecha }}</td>\n  </tr>\n</table>\n\n<p>El detalle completo fue almacenado en la tabla <strong>errores</strong> de PostgreSQL.</p>\n\n<hr>\n\n<p><small>Correo generado automáticamente por el Sistema HelpDesk Local Automatizado con n8n.</small></p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        0
+      ],
+      "id": "1118250e-d7eb-47aa-898f-8259cfd3933b",
+      "name": "Notificar error al administrador",
+      "webhookId": "43d4aa42-42e8-4722-a395-bf936bf1a241",
+      "credentials": {
+        "smtp": {
+          "id": "pUIVVdEbPF6T0isQ",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Capturar error del sistema": {
+      "main": [
+        [
+          {
+            "node": "Preparar detalle del error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar detalle del error": {
+      "main": [
+        [
+          {
+            "node": "Guardar error en BD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar error en BD": {
+      "main": [
+        [
+          {
+            "node": "Notificar error al administrador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a021630a-dc6a-4e17-bcff-c6517a936e88",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "39c8af791a4824f47287ed9c181b0a76e90d208fe04cd2dd2135964d6d1fa3de"
+  },
+  "id": "XvBUezvKvB01nWg6",
+  "tags": []
+}
